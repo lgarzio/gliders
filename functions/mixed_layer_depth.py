@@ -26,7 +26,11 @@ def profile_mld(df, mld_var='density', zvar='pressure', qi_threshold=0.5):
     """
     Written by Sam Coakley and Lori Garzio, Jan 2022
     Calculates the Mixed Layer Depth (MLD) for a single profile as the depth of max Brunt‐Vaisala frequency squared
-    (N**2) from Carvalho et al 2016 (https://doi.org/10.1002/2016GL071205)
+    (N**2) from Carvalho et al 2016 (https://doi.org/10.1002/2016GL071205). Calculates a Quality Index to determine
+    if the water column is well-mixed, hence calculating MLD is not appropriate and the function will return
+    MLD = np.nan, from Lorbacher et al, 2006 doi:10.1029/2003JC002157. When "QI > 0.8 a well defined MLD results.
+    For QI in the range 0.5– 0.8, increased uncertainty of the profile interpretation becomes evident and with
+    QI < 0.5 no mixed layer interpretation is possible." (from Section 3.4)
     :param df: depth profile in the form of a pandas dataframe
     :param mld_var: the name of the variable for which MLD is calculated, default is 'density'
     :param zvar: the name of the depth variable in the dataframe, default is 'pressure'
@@ -38,13 +42,16 @@ def profile_mld(df, mld_var='density', zvar='pressure', qi_threshold=0.5):
     if len(df) < 5:  # if there are <5 data bins, don't calculate MLD
         mld = np.nan
         maxN2 = np.nan
+        qi = np.nan
     elif np.sum(~np.isnan(pN2)) < 3:  # if there are <3 values calculated for pN2, don't calculate MLD
         mld = np.nan
         maxN2 = np.nan
+        qi = np.nan
     elif np.nanmax(np.diff(df[zvar])) > gap(np.nanmax(df[zvar]) - np.nanmin(df[zvar])):
         # if there is a gap in the profile that exceeds the defined threshold, don't calculate MLD
         mld = np.nan
         maxN2 = np.nan
+        qi = np.nan
     else:
         pressure_range = [np.nanmin(df[zvar]), np.nanmax(df[zvar])]
 
@@ -55,6 +62,7 @@ def profile_mld(df, mld_var='density', zvar='pressure', qi_threshold=0.5):
         if np.logical_or(mld_idx == 0, mld_idx == len(df) - 1):
             mld = np.nan
             maxN2 = np.nan
+            qi = np.nan
         else:
             mld = np.nanmean([df[zvar][mld_idx], df[zvar][mld_idx + 1]])
 
@@ -62,17 +70,19 @@ def profile_mld(df, mld_var='density', zvar='pressure', qi_threshold=0.5):
                 # if MLD is <5, return nan
                 mld = np.nan
                 maxN2 = np.nan
+                qi = np.nan
             elif np.logical_or(mld < pressure_range[0] + 2, mld > pressure_range[1] - 2):
                 # if MLD is within 2 dbar of the top or bottom of the profile, return nan
                 mld = np.nan
                 maxN2 = np.nan
+                qi = np.nan
             else:
                 if qi_threshold:
                     # find MLD  1.5
                     mld15 = mld * 1.5
                     mld15_idx = np.argmin(np.abs(df[zvar] - mld15))
 
-                    # Calculate Quality index (QI) from Lorbacher et al, 2006
+                    # Calculate Quality index (QI) from Lorbacher et al, 2006 doi:10.1029/2003JC002157
                     surface_mld_values = df[mld_var][0:mld_idx]  # values from the surface to MLD
                     surface_mld15_values = df[mld_var][0:mld15_idx]  # values from the surface to MLD * 1.5
 
@@ -84,4 +94,4 @@ def profile_mld(df, mld_var='density', zvar='pressure', qi_threshold=0.5):
                         mld = np.nan
                         maxN2 = np.nan
 
-    return mld, maxN2
+    return mld, maxN2, qi

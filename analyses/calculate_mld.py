@@ -2,7 +2,7 @@
 
 """
 Author: Lori Garzio on 1/11/2022
-Last modified: 11/7/2023
+Last modified: 11/8/2023
 Modified from code from Sam Coakley following theory from Carvalho et al 2016 https://doi.org/10.1002/2016GL071205
 Calculate Mixed Layer Depth for glider profiles using density and pressure, then add the MLD variable to the .nc file.
 The dataset provided must have 'time' or 'profile_time' as the only coordinate in order to convert the dataset to a
@@ -52,6 +52,7 @@ def main(fname, timevar, plots, mldvar, zvar):
         if len(temp_df) == 0:
             mldx = np.repeat(np.nan, ll)
             max_n2x = np.repeat(np.nan, ll)
+            qi = 'MLD not calculated'
         else:
             # calculate profile's pressure range
             pressure_range = (np.nanmax(temp_df[zvar]) - np.nanmin(temp_df[zvar]))
@@ -60,45 +61,47 @@ def main(fname, timevar, plots, mldvar, zvar):
                 # if the profile spans <5 dbar, don't calculate MLD
                 mldx = np.repeat(np.nan, ll)
                 max_n2x = np.repeat(np.nan, ll)
+                qi = 'MLD not calculated'
 
             else:
                 kwargs = {'zvar': zvar}
-                mldx, N2 = mldfunc.profile_mld(temp_df, **kwargs)
+                mldx, N2, qi = mldfunc.profile_mld(temp_df, **kwargs)
                 mldx = np.repeat(mldx, ll)
                 max_n2x = np.repeat(N2, ll)
 
-                if plots:
-                    try:
-                        tstr = group[0].strftime("%Y-%m-%dT%H%M%SZ")
-                    except AttributeError:
-                        tstr = pd.to_datetime(np.nanmin(group[1].time)).strftime("%Y-%m-%dT%H%M%SZ")
-                    # plot temperature
-                    fig, ax = plt.subplots(figsize=(8, 10))
-                    ax.scatter(temp_df['temperature'], temp_df[zvar])
+        if plots:
+            try:
+                tstr = group[0].strftime("%Y-%m-%dT%H%M%SZ")
+            except AttributeError:
+                tstr = pd.to_datetime(np.nanmin(group[1].time)).strftime("%Y-%m-%dT%H%M%SZ")
+            # plot temperature
+            fig, ax = plt.subplots(figsize=(8, 10))
+            ax.scatter(temp_df['temperature'], temp_df[zvar])
 
-                    ax.invert_yaxis()
-                    ax.set_ylabel('Pressure (dbar)')
-                    ax.set_xlabel('temperature')
+            ax.invert_yaxis()
+            ax.set_ylabel('Pressure (dbar)')
+            ax.set_xlabel('temperature')
 
-                    ax.axhline(y=np.unique(mldx), ls='--', c='k')
+            ax.axhline(y=np.unique(mldx), ls='--', c='k')
 
-                    sfile = os.path.join(plots, f'temperature_{tstr}.png')
-                    plt.savefig(sfile, dpi=300)
-                    plt.close()
+            sfile = os.path.join(plots, f'temperature_{tstr}.png')
+            plt.savefig(sfile, dpi=300)
+            plt.close()
 
-                    # plot density
-                    fig, ax = plt.subplots(figsize=(8, 10))
-                    ax.scatter(temp_df['density'], temp_df[zvar])
+            # plot density
+            fig, ax = plt.subplots(figsize=(8, 10))
+            ax.scatter(temp_df['density'], temp_df[zvar])
 
-                    ax.invert_yaxis()
-                    ax.set_ylabel('Pressure (dbar)')
-                    ax.set_xlabel('density')
+            ax.invert_yaxis()
+            ax.set_ylabel('Pressure (dbar)')
+            ax.set_xlabel('density')
+            ax.set_title(f'QI = {qi}\nN2 = {np.unique(max_n2x)[0]}')
 
-                    ax.axhline(y=np.unique(mldx), ls='--', c='k')
+            ax.axhline(y=np.unique(mldx), ls='--', c='k')
 
-                    sfile = os.path.join(plots, f'density{tstr}.png')
-                    plt.savefig(sfile, dpi=300)
-                    plt.close()
+            sfile = os.path.join(plots, f'density{tstr}.png')
+            plt.savefig(sfile, dpi=300)
+            plt.close()
 
         mld = np.append(mld, mldx)
         max_n2 = np.append(max_n2, max_n2x)
